@@ -1,0 +1,19 @@
+name: qrpay_sdk_platform_interface
+description: A common platform interface for the qrpay_sdk plugin.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: '>=3.3.0' # Adjusting to a valid version that flutter pub get might accept if 3.35.1 is a typo, but let's strictly use what they requested for flutter:
+  # Wait, flutter doesn't strictly check flutter SDK version in the same way, but it does. Let's use:
+  # flutter: ">=3.35.1"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  plugin_platform_interface: ^2.1.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter

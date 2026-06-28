@@ -1,0 +1,22 @@
+name: qrpay_sdk_ios
+description: The iOS implementation of qrpay_sdk.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=3.35.1"
+
+flutter:
+  plugin:
+    implements: qrpay_sdk
+    platforms:
+      ios:
+        pluginClass: QrpaySdkPlugin
+        dartPluginClass: QrpaySdkIOS
+
+dependencies:
+  flutter:
+    sdk: flutter
+  qrpay_sdk_platform_interface:
+    path: ../qrpay_sdk_platform_interface

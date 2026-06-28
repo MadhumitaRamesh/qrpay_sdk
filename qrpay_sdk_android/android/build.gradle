@@ -1,0 +1,46 @@
+group = "com.example.qrpay_sdk"
+version = "1.0-SNAPSHOT"
+
+// Uses Flutter's built-in Kotlin support — no explicit KGP classpath needed.
+apply plugin: 'com.android.library'
+apply plugin: 'kotlin-android'
+
+android {
+    if (project.android.hasProperty("namespace")) {
+        namespace = "com.example.qrpay_sdk"
+    }
+
+    compileSdk = 34
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_1_8
+        targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
+    sourceSets {
+        main.java.srcDirs += 'src/main/kotlin'
+    }
+
+    defaultConfig {
+        minSdk = 24
+    }
+}
+
+dependencies {
+    // CameraX core library using the camera2 implementation
+    def camerax_version = "1.3.4"
+    implementation "androidx.camera:camera-core:${camerax_version}"
+    implementation "androidx.camera:camera-camera2:${camerax_version}"
+    implementation "androidx.camera:camera-lifecycle:${camerax_version}"
+
+    // ML Kit Barcode Scanning
+    implementation 'com.google.mlkit:barcode-scanning:17.3.0'
+
+    // Coroutines for ListenableFuture integration
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.7.3'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+}

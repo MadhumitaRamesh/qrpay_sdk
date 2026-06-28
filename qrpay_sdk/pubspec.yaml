@@ -1,0 +1,31 @@
+name: qrpay_sdk
+description: App-facing package for QRPay SDK.
+version: 0.0.1
+publish_to: none
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=3.35.1"
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        default_package: qrpay_sdk_android
+      ios:
+        default_package: qrpay_sdk_ios
+
+dependencies:
+  flutter:
+    sdk: flutter
+  qrpay_sdk_platform_interface:
+    path: ../qrpay_sdk_platform_interface
+  qrpay_sdk_android:
+    path: ../qrpay_sdk_android
+  qrpay_sdk_ios:
+    path: ../qrpay_sdk_ios
+  geolocator: ^13.0.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
