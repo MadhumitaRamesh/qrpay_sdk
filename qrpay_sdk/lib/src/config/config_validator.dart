@@ -11,7 +11,7 @@ class Result<T, E> {
   final T? value;
   final E? error;
   
-  bool get isSuccess => value != null && error == null;
+  bool get isSuccess => error == null;
   bool get isError => error != null;
 
   Result.success(this.value) : error = null;
@@ -30,6 +30,18 @@ class ConfigValidator {
       return Result.error(ConfigInvalidError(
         'maxDigitalZoom',
         'Must be in range [1.0, 10.0]',
+      ));
+    }
+    if (config.autoZoomTimeout.inMilliseconds < 0) {
+      return Result.error(ConfigInvalidError(
+        'autoZoomTimeout',
+        'Cannot be negative',
+      ));
+    }
+    if (config.scanSessionTimeout.inMilliseconds < 0) {
+      return Result.error(ConfigInvalidError(
+        'scanSessionTimeout',
+        'Cannot be negative',
       ));
     }
     return Result.success(null);

@@ -32,18 +32,32 @@ class ScanEventLifecycle extends ScanEvent {
   ScanEventLifecycle(this.event);
 }
 
+/// Main entry point for the QRPay SDK.
+///
+/// Use [initialize] to set up the SDK before calling [startScanning].
+/// Example:
+/// ```dart
+/// await QRPay.initialize(QRPayConfig(overlayStyle: OverlayStyle.dark()));
+/// ```
 class QRPay {
   static final StreamController<bool> _torchStateController = StreamController<bool>.broadcast();
   static final StreamController<double> _zoomLevelController = StreamController<double>.broadcast();
   static final StreamController<String> _thermalStateController = StreamController<String>.broadcast();
 
+  /// Stream broadcasting the current torch state (true if on).
   static Stream<bool> get torchState => _torchStateController.stream;
+
+  /// Stream broadcasting the current native zoom level factor.
   static Stream<double> get zoomLevel => _zoomLevelController.stream;
+
+  /// Stream broadcasting the hardware thermal state ('normal', 'fair', 'serious', 'critical').
   static Stream<String> get thermalState => _thermalStateController.stream;
   
   static QRPayConfig? _config;
   static bool _isDisposed = false;
 
+  /// Initializes the native camera pipeline and prepares for scanning.
+  /// Pre-warms the camera asynchronously to achieve fast startup times.
   static Future<void> initialize(QRPayConfig config) async {
     _isDisposed = false;
     final validation = ConfigValidator.validate(config);
@@ -68,6 +82,8 @@ class QRPay {
     await QrpaySdkPlatform.instance.initialize(configMap);
   }
 
+  /// Disposes of the native camera resources.
+  /// Safe to call multiple times.
   static Future<void> dispose() async {
     if (_isDisposed) return;
     _isDisposed = true;
@@ -77,6 +93,8 @@ class QRPay {
 
   static Timer? _sessionTimer;
 
+  /// Starts the camera stream and barcode detection.
+  /// Returns a stream of [ScanEvent] to track lifecycle, errors, and results.
   static Stream<ScanEvent> startScanning() {
     _sessionTimer?.cancel();
 
@@ -99,9 +117,20 @@ class QRPay {
               if (lEvent == 'camera-unrecoverable') controller.add(ScanEventError(const CameraUnrecoverable()));
               if (lEvent == 'permission-revoked') controller.add(ScanEventError(const PermissionRevoked()));
             } else if (type == 'error') {
-              // TODO: Map specific native error codes to typed errors when more are defined.
-              // Using ConfigInvalid as a fallback for unclassified native errors.
-              controller.add(ScanEventError(ConfigInvalid(description: event['description'] as String? ?? 'Unknown native error')));
+              final code = event['code'];
+              final desc = event['description'] as String? ?? 'Unknown native error';
+              
+              if (code == 'permission-denied') {
+                controller.add(ScanEventError(PermissionDenied(description: desc)));
+              } else if (code == 'camera-unavailable') {
+                controller.add(ScanEventError(CameraUnavailable(description: desc)));
+              } else if (code == 'torch-unavailable') {
+                controller.add(ScanEventError(TorchUnavailable(description: desc)));
+              } else {
+                // TODO: Map specific native error codes to typed errors when more are defined.
+                // Using ConfigInvalid as a fallback for unclassified native errors.
+                controller.add(ScanEventError(ConfigInvalid(description: desc)));
+              }
             } else if (type == 'result') {
               _sessionTimer?.cancel();
               final rawString = event['rawString'] as String;
@@ -162,15 +191,18 @@ class QRPay {
     return controller.stream;
   }
 
+  /// Stops the active scan session and pauses the camera stream.
   static Future<void> stopScanning() async {
     _sessionTimer?.cancel();
     await QrpaySdkPlatform.instance.stopScanning();
   }
 
+  /// Enables or disables the device torch/flash.
   static Future<void> setTorch(bool on) async {
     await QrpaySdkPlatform.instance.setTorch(on);
   }
 
+  /// Adjusts the camera zoom level.
   static Future<void> setZoom(double ratio) async {
     await QrpaySdkPlatform.instance.setZoom(ratio);
     _zoomLevelController.add(ratio);

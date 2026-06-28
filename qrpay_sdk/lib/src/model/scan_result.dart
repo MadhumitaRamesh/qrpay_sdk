@@ -1,6 +1,7 @@
 import 'payment_data.dart';
 import 'location_fix.dart';
 
+/// Represents a successful QR code scan event, containing both the raw data and parsed payment details.
 class ScanResult {
   final String rawString;
   final PaymentData? payment;

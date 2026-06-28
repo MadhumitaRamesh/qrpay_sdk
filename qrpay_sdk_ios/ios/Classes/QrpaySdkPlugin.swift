@@ -3,6 +3,7 @@ import UIKit
 
 public class QrpaySdkPlugin: NSObject, FlutterPlugin, FlutterStreamHandler {
   private var eventSink: FlutterEventSink?
+  private var pipeline: CameraPipeline?
 
   public static func register(with registrar: FlutterPluginRegistrar) {
     let methodChannel = FlutterMethodChannel(name: "qrpay_sdk/control", binaryMessenger: registrar.messenger())
@@ -16,30 +17,30 @@ public class QrpaySdkPlugin: NSObject, FlutterPlugin, FlutterStreamHandler {
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
     case "initialize":
-      // TODO: Implement camera pre-warm and configuration via AVFoundation
-      // Corresponds to Android initializeAsync()
+      if pipeline == nil {
+          pipeline = CameraPipeline(eventSink: { [weak self] in self?.eventSink })
+      }
+      pipeline?.initializeAsync()
       result(nil)
     case "dispose":
-      // TODO: Release camera resources
-      // Corresponds to Android shutdownPipeline()
+      pipeline?.shutdownPipeline()
+      pipeline = nil
       result(nil)
     case "startScanning":
-      // TODO: Bind use cases, start AVCaptureSession, emit texture ID
-      // Corresponds to Android startScanning()
-      // Needs to emit: camera-ready, started, camera-interrupted, camera-unrecoverable, permission-revoked, permission-denied
-      result(-1) // Stub texture ID
+      let textureId = pipeline?.startScanning() ?? -1
+      result(textureId)
     case "stopScanning":
-      // TODO: Stop capture session
-      // Needs to emit: stopped, releaseLocation
+      pipeline?.shutdownPipeline()
       result(nil)
     case "setTorch":
-      // let on = args?["on"] as? Bool ?? false
-      // TODO: set torch logic
+      let args = call.arguments as? [String: Any]
+      let on = args?["on"] as? Bool ?? false
+      pipeline?.setTorch(on: on)
       result(nil)
     case "setZoom":
-      // let args = call.arguments as? [String: Any]
-      // let ratio = args?["ratio"] as? Double ?? 1.0
-      // TODO: set zoom logic
+      let args = call.arguments as? [String: Any]
+      let ratio = args?["ratio"] as? Double ?? 1.0
+      pipeline?.setZoom(ratio: ratio)
       result(nil)
     default:
       result(FlutterMethodNotImplemented)
@@ -48,7 +49,6 @@ public class QrpaySdkPlugin: NSObject, FlutterPlugin, FlutterStreamHandler {
 
   public func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
     self.eventSink = events
-    // TODO: wire up events logic
     return nil
   }
 

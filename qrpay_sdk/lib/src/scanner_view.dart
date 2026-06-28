@@ -7,6 +7,11 @@ import 'model/qrpay_error.dart';
 import 'overlay/positioning_overlay_painter.dart';
 import 'state/auto_zoom_controller.dart';
 
+/// A drop-in Flutter widget that displays the live camera preview and positioning overlay.
+///
+/// It automatically manages the lifecycle of the underlying native camera pipeline,
+/// provides pinch-to-zoom gestures that interact seamlessly with auto-zoom, and
+/// surfaces scan results and errors via callbacks.
 class ScannerView extends StatefulWidget {
   final QRPayConfig config;
   final void Function(ScanResult)? onScan;

@@ -1,5 +1,8 @@
 import 'overlay_style.dart';
 
+/// Configuration options for the QRPay SDK.
+///
+/// Use this to customize the scanning behavior, UI overlay, and performance limits.
 class QRPayConfig {
   final List<String> supportedSchemes;
   final bool autoZoomEnabled;

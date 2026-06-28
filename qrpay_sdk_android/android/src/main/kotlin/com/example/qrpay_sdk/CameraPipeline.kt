@@ -298,7 +298,7 @@ class CameraPipeline(
         Log.d(TAG, "[Shutdown] step 5: clear state - \${t5 - t4}ms")
 
         coroutineScope.launch(Dispatchers.Main) {
-            eventSink()?.success(mapOf("type" to "lifecycle", "event" to "stopped"))
+            eventSink()?.success(mapOf("type" to "lifecycle", "event" to "scan-complete"))
             Log.d(TAG, "[Shutdown] step 6: scan-complete event emitted. Total time: \${System.currentTimeMillis() - t0}ms")
         }
     }

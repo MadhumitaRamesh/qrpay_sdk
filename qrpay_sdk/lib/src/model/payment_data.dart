@@ -1,3 +1,4 @@
+/// Standardized payment information extracted from a recognized QR code scheme (e.g. EMVCo or UPI).
 class PaymentData {
   final String schemeId;
   final double? amount;
