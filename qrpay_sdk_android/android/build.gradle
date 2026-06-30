@@ -28,6 +28,15 @@ android {
     defaultConfig {
         minSdk = 24
     }
+
+    buildTypes {
+        release {
+            // REQ-02.6: Enable R8 code shrinking. Library modules use consumerProguardFiles
+            // to pass rules through to the consuming app's R8 pass.
+            minifyEnabled false  // Libraries should NOT self-minify; let the app's R8 handle it.
+            consumerProguardFiles 'consumer-rules.pro'
+        }
+    }
 }
 
 dependencies {

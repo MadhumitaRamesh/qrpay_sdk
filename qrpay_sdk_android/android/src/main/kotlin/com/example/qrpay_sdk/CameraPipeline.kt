@@ -62,6 +62,12 @@ class CameraPipeline(
     private val coroutineScope = CoroutineScope(Dispatchers.Main + Job())
     private val analysisExecutor = Executors.newSingleThreadExecutor()
 
+    // Timing anchors for greppable log metrics
+    private var initCallTime = 0L
+    private var startScanCallTime = 0L
+    private var firstFrameLogged = false
+    private var detectionTime = 0L
+
     private var cameraProvider: ProcessCameraProvider? = null
     private var camera: Camera? = null
     private var preview: Preview? = null
@@ -78,9 +84,17 @@ class CameraPipeline(
         private set
 
     fun initializeAsync() {
+        // REQ-03.3: Record the wall-clock time at the point the Flutter method call arrives.
+        initCallTime = System.currentTimeMillis()
+        Log.d(TAG, "[Init] Starting pre-warm on background thread")
+
+        // METRIC-1: Time from initialize() Flutter call to this function returning (i.e. Future<void>
+        // completing on Dart side). The coroutine is launched but we return immediately, so the
+        // Future completes before the coroutine body runs. Log INIT_COMPLETE_MS here.
+        val initReturnTime = System.currentTimeMillis()
+        Log.d(TAG, "[QRPaySDK_METRIC] INIT_COMPLETE_MS: ${initReturnTime - initCallTime}")
+
         coroutineScope.launch {
-            val startTime = System.currentTimeMillis()
-            Log.d(TAG, "[Init] Starting pre-warm on background thread")
             try {
                 cameraProvider = ProcessCameraProvider.getInstance(context).await()
                 scanner = BarcodeScanning.getClient()
@@ -93,9 +107,11 @@ class CameraPipeline(
                 setupThermalMonitoring()
 
                 isPreWarmed = true
-                Log.d(TAG, "[Init] Pre-warm done in \${System.currentTimeMillis() - startTime}ms")
 
                 withContext(Dispatchers.Main) {
+                    // METRIC-2: Time from initialize() call to camera-ready event (actual pre-warm done).
+                    val prewarmMs = System.currentTimeMillis() - initCallTime
+                    Log.d(TAG, "[QRPaySDK_METRIC] PREWARM_COMPLETE_MS: $prewarmMs")
                     eventSink()?.success(mapOf("type" to "lifecycle", "event" to "camera-ready"))
                 }
             } catch (e: Exception) {
@@ -131,7 +147,10 @@ class CameraPipeline(
             return -1
         }
 
-        val startTime = System.currentTimeMillis()
+        // REQ-04.3: Record start time for FIRST_FRAME_MS metric. Reset first-frame flag.
+        startScanCallTime = System.currentTimeMillis()
+        firstFrameLogged = false
+        val startTime = startScanCallTime
         Log.d(TAG, "[Start] startScanning invoked")
 
         if (cameraProvider == null) {
@@ -225,11 +244,20 @@ class CameraPipeline(
 
         val mediaImage = imageProxy.image
         if (mediaImage != null && scanner != null) {
+            // METRIC-3: Log the first frame that actually reaches ML Kit processing.
+            if (!firstFrameLogged) {
+                firstFrameLogged = true
+                val firstFrameMs = System.currentTimeMillis() - startScanCallTime
+                Log.d(TAG, "[QRPaySDK_METRIC] FIRST_FRAME_MS: $firstFrameMs")
+            }
+
             val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
             scanner?.process(image)
                 ?.addOnSuccessListener { barcodes ->
                     if (barcodes.isNotEmpty()) {
-                        lastDetectionTime = System.currentTimeMillis()
+                        // Record detection time for DECODE_MS and SHUTDOWN_TOTAL_MS metrics.
+                        detectionTime = System.currentTimeMillis()
+                        lastDetectionTime = detectionTime
                         val barcode = barcodes.first()
                         val rawString = barcode.rawValue ?: ""
                         
@@ -250,6 +278,9 @@ class CameraPipeline(
                         )
                         
                         coroutineScope.launch(Dispatchers.Main) {
+                            // METRIC-4: Time from QR detection to scan-result event emission.
+                            val decodeMs = System.currentTimeMillis() - detectionTime
+                            Log.d(TAG, "[QRPaySDK_METRIC] DECODE_MS: $decodeMs")
                             eventSink()?.success(scanMap)
                         }
 
@@ -299,7 +330,10 @@ class CameraPipeline(
 
         coroutineScope.launch(Dispatchers.Main) {
             eventSink()?.success(mapOf("type" to "lifecycle", "event" to "scan-complete"))
-            Log.d(TAG, "[Shutdown] step 6: scan-complete event emitted. Total time: \${System.currentTimeMillis() - t0}ms")
+            val shutdownTotalMs = System.currentTimeMillis() - t0
+            Log.d(TAG, "[Shutdown] step 6: scan-complete event emitted. Total time: ${shutdownTotalMs}ms")
+            // METRIC-5: Summary line for the full shutdown sequence (scan-result -> scan-complete).
+            Log.d(TAG, "[QRPaySDK_METRIC] SHUTDOWN_TOTAL_MS: $shutdownTotalMs")
         }
     }
 
