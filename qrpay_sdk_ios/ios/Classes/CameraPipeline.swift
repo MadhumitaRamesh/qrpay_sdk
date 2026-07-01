@@ -13,6 +13,7 @@ class CameraPipeline: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     private var videoDeviceInput: AVCaptureDeviceInput?
     private let sequenceRequestHandler = VNSequenceRequestHandler()
     private var isPreWarmed = false
+    private let processingSemaphore = DispatchSemaphore(value: 1)
     
     private var lastDetectionTime: TimeInterval = 0
     private var frameCount = 0
@@ -42,16 +43,31 @@ class CameraPipeline: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
                 self.videoDeviceInput = deviceInput
                 
                 self.captureSession.beginConfiguration()
+                self.captureSession.sessionPreset = .hd1280x720
                 if self.captureSession.canAddInput(deviceInput) {
                     self.captureSession.addInput(deviceInput)
                 }
                 
+                self.videoDataOutput.videoSettings = [kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange]
                 self.videoDataOutput.alwaysDiscardsLateVideoFrames = true
                 self.videoDataOutput.setSampleBufferDelegate(self, queue: self.backgroundQueue)
                 if self.captureSession.canAddOutput(self.videoDataOutput) {
                     self.captureSession.addOutput(self.videoDataOutput)
                 }
                 self.captureSession.commitConfiguration()
+                
+                // Pre-warm Vision
+                let dummyPixelBuffer = self.createDummyPixelBuffer()
+                if let buffer = dummyPixelBuffer {
+                    let request = VNDetectBarcodesRequest()
+                    request.symbologies = [.qr]
+                    request.usesCPUOnly = false
+                    if #available(iOS 14.3, *) {
+                        request.revision = VNDetectBarcodesRequestRevision3
+                    }
+                    try? self.sequenceRequestHandler.perform([request], on: buffer)
+                }
+                os_log("[QRPaySDK_METRIC] MLKIT_WARMUP_MS: %f", log: .default, type: .debug, (CACurrentMediaTime() - startTime) * 1000)
                 
                 self.isPreWarmed = true
                 os_log("[Init] Pre-warm done in %f ms", log: .default, type: .debug, (CACurrentMediaTime() - startTime) * 1000)
@@ -183,6 +199,11 @@ class CameraPipeline: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
     }
     
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
+        if processingSemaphore.wait(timeout: .now()) == .timedOut {
+            return
+        }
+        defer { processingSemaphore.signal() }
+        
         let now = CACurrentMediaTime()
         let timeSinceLastDetection = now - lastDetectionTime
         
@@ -228,6 +249,10 @@ class CameraPipeline: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
         }
         
         request.symbologies = [.qr]
+        request.usesCPUOnly = false
+        if #available(iOS 14.3, *) {
+            request.revision = VNDetectBarcodesRequestRevision3
+        }
         
         do {
             try sequenceRequestHandler.perform([request], on: pixelBuffer)
@@ -271,5 +296,13 @@ class CameraPipeline: NSObject, AVCaptureVideoDataOutputSampleBufferDelegate {
             eventSink()?(["type": "lifecycle", "event": "camera-unrecoverable"])
             shutdownPipeline()
         }
+    }
+
+    private func createDummyPixelBuffer() -> CVPixelBuffer? {
+        var pixelBuffer: CVPixelBuffer?
+        let attrs = [kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue,
+                     kCVPixelBufferCGBitmapContextCompatibilityKey: kCFBooleanTrue] as CFDictionary
+        CVPixelBufferCreate(kCFAllocatorDefault, 1, 1, kCVPixelFormatType_420YpCbCr8BiPlanarFullRange, attrs, &pixelBuffer)
+        return pixelBuffer
     }
 }

@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 // flutter_test's versions take precedence.
 import 'package:glados/glados.dart' hide test, group, expect, setUp,
     setUpAll, tearDown, tearDownAll, addTearDown, isA, closeTo, isTrue,
-    isFalse, isNull, isNotNull, isA, throwsA, same, anything;
+    isFalse, isNull, isNotNull, throwsA, same, anything;
 import 'package:qrpay_sdk/src/parser/payment_parser.dart';
 import 'package:qrpay_sdk/src/model/qrpay_error.dart';
 

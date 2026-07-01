@@ -97,11 +97,24 @@ class CameraPipeline(
         coroutineScope.launch {
             try {
                 cameraProvider = ProcessCameraProvider.getInstance(context).await()
-                scanner = BarcodeScanning.getClient()
+                val options = com.google.mlkit.vision.barcode.BarcodeScannerOptions.Builder()
+                    .setBarcodeFormats(com.google.mlkit.vision.barcode.common.Barcode.FORMAT_QR_CODE)
+                    .build()
+                scanner = BarcodeScanning.getClient(options)
+                
+                val blankBitmap = android.graphics.Bitmap.createBitmap(1, 1, android.graphics.Bitmap.Config.ARGB_8888)
+                val dummyImage = InputImage.fromBitmap(blankBitmap, 0)
+                val warmupStart = System.currentTimeMillis()
+                scanner?.process(dummyImage)?.addOnCompleteListener {
+                    Log.d(TAG, "[QRPaySDK_METRIC] MLKIT_WARMUP_MS: ${System.currentTimeMillis() - warmupStart}")
+                }
 
                 preview = Preview.Builder().build()
                 imageAnalysis = ImageAnalysis.Builder()
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
+                    .setTargetResolution(android.util.Size(1280, 720))
+                    .setTargetRotation(android.view.Surface.ROTATION_0)
                     .build()
 
                 setupThermalMonitoring()
@@ -190,6 +203,7 @@ class CameraPipeline(
                 preview,
                 imageAnalysis
             )
+            camera?.cameraControl?.setZoomRatio(1.0f)
             
             camera?.cameraInfo?.cameraState?.observe(lifecycleOwner!!) { state ->
                 if (state.error != null) {
@@ -228,8 +242,15 @@ class CameraPipeline(
         }
     }
 
+    private val isProcessing = java.util.concurrent.atomic.AtomicBoolean(false)
+
     @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
     private fun processImageProxy(imageProxy: ImageProxy) {
+        if (!isProcessing.compareAndSet(false, true)) {
+            imageProxy.close()
+            return
+        }
+        val arrivalTime = System.currentTimeMillis()
         val now = System.currentTimeMillis()
         val timeSinceLastDetection = now - lastDetectionTime
 
@@ -238,12 +259,15 @@ class CameraPipeline(
             frameCount++
             if (frameCount % 3 != 0) {
                 imageProxy.close()
+                isProcessing.set(false)
                 return
             }
         }
 
         val mediaImage = imageProxy.image
         if (mediaImage != null && scanner != null) {
+            val frameToMlkit = System.currentTimeMillis() - arrivalTime
+            Log.d(TAG, "[QRPaySDK_METRIC] FRAME_TO_MLKIT_MS: $frameToMlkit")
             // METRIC-3: Log the first frame that actually reaches ML Kit processing.
             if (!firstFrameLogged) {
                 firstFrameLogged = true
@@ -252,8 +276,11 @@ class CameraPipeline(
             }
 
             val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+            val inferenceStart = System.currentTimeMillis()
             scanner?.process(image)
                 ?.addOnSuccessListener { barcodes ->
+                    val inferenceMs = System.currentTimeMillis() - inferenceStart
+                    Log.d(TAG, "[QRPaySDK_METRIC] MLKIT_INFERENCE_MS: $inferenceMs")
                     if (barcodes.isNotEmpty()) {
                         // Record detection time for DECODE_MS and SHUTDOWN_TOTAL_MS metrics.
                         detectionTime = System.currentTimeMillis()
@@ -280,7 +307,8 @@ class CameraPipeline(
                         coroutineScope.launch(Dispatchers.Main) {
                             // METRIC-4: Time from QR detection to scan-result event emission.
                             val decodeMs = System.currentTimeMillis() - detectionTime
-                            Log.d(TAG, "[QRPaySDK_METRIC] DECODE_MS: $decodeMs")
+                            val totalEmit = System.currentTimeMillis() - arrivalTime
+                            Log.d(TAG, "[QRPaySDK_METRIC] TOTAL_DETECT_TO_EMIT_MS: $totalEmit")
                             eventSink()?.success(scanMap)
                         }
 
@@ -298,9 +326,11 @@ class CameraPipeline(
                 }
                 ?.addOnCompleteListener {
                     imageProxy.close()
+                    isProcessing.set(false)
                 }
         } else {
             imageProxy.close()
+            isProcessing.set(false)
         }
     }
 
