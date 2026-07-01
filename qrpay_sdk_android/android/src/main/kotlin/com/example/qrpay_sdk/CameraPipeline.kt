@@ -288,7 +288,13 @@ class CameraPipeline(
                     }
                 }
                 ?.addOnFailureListener { e ->
-                    Log.e(TAG, "Barcode processing failed", e)
+                    if (e is com.google.mlkit.common.MlKitException && e.errorCode == com.google.mlkit.common.MlKitException.UNAVAILABLE) {
+                        coroutineScope.launch(Dispatchers.Main) {
+                            eventSink()?.success(mapOf("type" to "lifecycle", "event" to "ml-kit-downloading"))
+                        }
+                    } else {
+                        Log.e(TAG, "Barcode processing failed", e)
+                    }
                 }
                 ?.addOnCompleteListener {
                     imageProxy.close()

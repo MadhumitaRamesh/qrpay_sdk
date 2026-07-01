@@ -7,7 +7,7 @@ import 'model/qrpay_error.dart';
 import 'parser/payment_parser.dart';
 import 'state/location_state.dart';
 
-enum LifecycleEvent { started, paused, resumed, stopped }
+enum LifecycleEvent { started, paused, resumed, stopped, downloading }
 
 sealed class ScanEvent {}
 
@@ -114,6 +114,7 @@ class QRPay {
               if (lEvent == 'scan-complete') controller.add(ScanEventLifecycle(LifecycleEvent.stopped));
               if (lEvent == 'camera-ready') controller.add(ScanEventLifecycle(LifecycleEvent.resumed));
               if (lEvent == 'camera-interrupted') controller.add(ScanEventLifecycle(LifecycleEvent.paused));
+              if (lEvent == 'ml-kit-downloading') controller.add(ScanEventLifecycle(LifecycleEvent.downloading));
               if (lEvent == 'camera-unrecoverable') controller.add(ScanEventError(const CameraUnrecoverable()));
               if (lEvent == 'permission-revoked') controller.add(ScanEventError(const PermissionRevoked()));
             } else if (type == 'error') {
