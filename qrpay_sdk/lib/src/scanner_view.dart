@@ -107,10 +107,6 @@ class _ScannerViewState extends State<ScannerView> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
-    if (_textureId == null) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
     return GestureDetector(
       onScaleStart: _handleScaleStart,
       onScaleUpdate: _handleScaleUpdate,
@@ -118,10 +114,26 @@ class _ScannerViewState extends State<ScannerView> with SingleTickerProviderStat
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Texture(textureId: _textureId!),
-          CustomPaint(
-            painter: PositioningOverlayPainter(style: widget.config.overlayStyle),
-          ),
+          Container(color: Colors.black), // Background to prevent native surface flash
+          if (_textureId != null)
+            AnimatedOpacity(
+              opacity: _textureId != null ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 300),
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: 720,
+                  height: 1280,
+                  child: Texture(textureId: _textureId!),
+                ),
+              ),
+            ),
+          if (_textureId == null)
+            const Center(child: CircularProgressIndicator(color: Colors.white)),
+          if (_textureId != null)
+            CustomPaint(
+              painter: PositioningOverlayPainter(style: widget.config.overlayStyle),
+            ),
         ],
       ),
     );

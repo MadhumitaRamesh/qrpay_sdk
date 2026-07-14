@@ -87,6 +87,19 @@ class ScannerScreen extends StatefulWidget {
 class _ScannerScreenState extends State<ScannerScreen> {
   bool _isTorchOn = false;
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (MediaQuery.platformBrightnessOf(context) == Brightness.dark) {
+        setState(() {
+          _isTorchOn = true;
+        });
+        QRPay.setTorch(true);
+      }
+    });
+  }
+
   void _onScan(ScanResult result) {
     Navigator.pushReplacement(
       context,
