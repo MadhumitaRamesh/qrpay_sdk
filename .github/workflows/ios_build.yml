@@ -21,12 +21,12 @@ jobs:
           
       - name: Build iOS App
         run: |
-          cd example
+          cd qrpay_sdk/example
           flutter build ios --release --no-codesign
           
       - name: Package into IPA
         run: |
-          cd example
+          cd qrpay_sdk/example
           mkdir -p Payload
           cp -r build/ios/iphoneos/Runner.app Payload/
           zip -r QRPay_Demo_iOS_Unsigned.ipa Payload
@@ -35,4 +35,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: QRPay-iOS-App
-          path: example/QRPay_Demo_iOS_Unsigned.ipa
+          path: qrpay_sdk/example/QRPay_Demo_iOS_Unsigned.ipa
